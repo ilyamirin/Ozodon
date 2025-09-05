@@ -194,22 +194,22 @@ flowchart TD
   ExtPeer2([Внешний узел B])
 
   %% Веб-слой
-  GW[Web/API Gateway\n(CORS, Auth, RateLimit)]
-  App[FastAPI App\nmain.py]
+  GW[Web/API Gateway<br/>(CORS, Auth, RateLimit)]
+  App[FastAPI App<br/>main.py]
   GW --> App
 
   %% Роуты и протокол
-  HubRoutes[/routes.hub\n/hub/inbox, /hub/search,\n/trust/score, /feeds, /tags, /categories,\n/payments: create/confirm/refund/]
+  HubRoutes[/routes.hub<br/>/hub/inbox, /hub/search,<br/>/trust/score, /feeds, /tags, /categories,<br/>/payments: create/confirm/refund/]
   WebRoutes[/routes.web/]
   App --> HubRoutes
   App --> WebRoutes
 
   %% ActivityPub
-  APHelpers[activitypub.py\nmake_offer, make_trust]
+  APHelpers[activitypub.py<br/>make_offer, make_trust]
   HubRoutes <--> APHelpers
 
   %% Индексация и поиск
-  HSvc[services.hub_service\nindex_offer, index_trust,\nsearch_products, replicate_to_peers]
+  HSvc[services.hub_service<br/>index_offer, index_trust,<br/>search_products, replicate_to_peers]
   HubRoutes --> HSvc
 
   %% База данных
@@ -221,11 +221,11 @@ flowchart TD
   HSvc --> TrustLog
 
   %% Репутация
-  TrustOpt[[services.trust_service\ncompute_trust_score (опц.)]]
+  TrustOpt[[services.trust_service<br/>compute_trust_score (опц.)]]
   HSvc -.optional .-> TrustOpt
 
   %% Поиск
-  SearchRank[[Ранжирование\nцена x доверие]]
+  SearchRank[[Ранжирование<br/>цена x доверие]]
   HSvc --> SearchRank
 
   %% Репликация
@@ -233,7 +233,7 @@ flowchart TD
   HSvc -- replicate_to_peers --> ExtPeer2
 
   %% Платежи TON
-  TON[services.ton_payment\nTONPaymentService, confirm_delivery, request_refund]
+  TON[services.ton_payment<br/>TONPaymentService, confirm_delivery, request_refund]
   HubRoutes --> TON
 
   %% Будущие/нереализованные подсистемы
