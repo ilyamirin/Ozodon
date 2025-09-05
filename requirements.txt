@@ -1,0 +1,14 @@
+# Core dependencies for Ozodon
+# Python 3.10+
+
+fastapi>=0.110
+uvicorn[standard]>=0.22
+motor>=3.4
+pydantic>=2.3
+httpx>=0.24
+jinja2>=3.1
+# Starlette StaticFiles benefits from aiofiles for async file serving
+aiofiles>=23.2.1
+
+# Optional: TON SDK (application runs without it due to safe fallbacks)
+# tonutils>=0.0.8
