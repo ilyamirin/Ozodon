@@ -1,0 +1,9 @@
+# Примеры импорта дампа в MongoDB (PowerShell / cmd)
+# Замените <MONGO_URI> и <DB_NAME> при необходимости.
+
+mongoimport --uri="<MONGO_URI>" --db=<DB_NAME> --collection=hub_offers --file="examples\hub_offers.json" --jsonArray
+mongoimport --uri="<MONGO_URI>" --db=<DB_NAME> --collection=hub_trust_log --file="examples\hub_trust_log.json" --jsonArray
+mongoimport --uri="<MONGO_URI>" --db=<DB_NAME> --collection=trust_log --file="examples\trust_log.json" --jsonArray
+
+# Пример для локальной базы
+# mongoimport --uri="mongodb://localhost:27017" --db=ozodon --collection=hub_offers --file="examples\hub_offers.json" --jsonArray

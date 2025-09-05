@@ -1,5 +1,6 @@
 # routes/hub.py
 from fastapi import APIRouter, HTTPException
+from typing import Dict, Any
 
 import config
 from database import db
@@ -27,10 +28,74 @@ async def search(q: str = None, tag: str = "", min_price: float = None, max_pric
     results = await search_products(q, tag, min_price, max_price, limit)
     return {"results": results}
 
+@router.get("/trust/score")
+async def trust_score(actor: str) -> Dict[str, Any]:
+    """Простейший расчёт репутации на основе входящих связей доверия.
+    Если входящих нет — возвращаем 0.5 как нейтральный балл.
+    """
+    check_enabled()
+    pipeline = [
+        {"$match": {"target": actor}},
+        {"$group": {"_id": "$target", "avg_weight": {"$avg": "$weight"}, "count": {"$sum": 1}}},
+    ]
+    agg = await db.hub_trust_log.aggregate(pipeline).to_list(length=1)
+    if agg:
+        score = float(agg[0].get("avg_weight", 0.5))
+        count = int(agg[0].get("count", 0))
+    else:
+        score, count = 0.5, 0
+    return {"actor": actor, "score": score, "votes": count}
+
 @router.get("/hubs")
 async def list_hubs():
     check_enabled()
     return load_hubs()
+
+@router.get("/seller/{actor_id}")
+async def seller(actor_id: str):
+    check_enabled()
+    offers = await db.hub_offers.find({"seller": actor_id}).sort("published", -1).limit(100).to_list(length=100)
+    # Получим базовый скор
+    score_doc = await trust_score(actor_id)
+    return {"seller": actor_id, "trust": score_doc, "offers": offers}
+
+@router.get("/feeds/latest")
+async def feeds_latest(limit: int = 20):
+    check_enabled()
+    cursor = db.hub_offers.find({}).sort("published", -1).limit(limit)
+    items = await cursor.to_list(length=limit)
+    return {"items": items, "limit": limit}
+
+@router.get("/tags")
+async def tags_top(limit: int = 50):
+    check_enabled()
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": limit},
+    ]
+    tags = await db.hub_offers.aggregate(pipeline).to_list(length=limit)
+    # Приводим к простому виду
+    return {"tags": [{"tag": t["_id"], "count": t["count"]} for t in tags]}
+
+@router.get("/categories")
+async def categories():
+    check_enabled()
+    # Упрощение: категории как верхние теги
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]
+    cats = await db.hub_offers.aggregate(pipeline).to_list(length=20)
+    return {"categories": [c["_id"] for c in cats]}
+
+@router.post("/replicate")
+async def replicate(activity: dict):
+    """Приём репликации между хабами — делаем то же, что и в inbox"""
+    return await hub_inbox(activity)
 
 @router.get("/info")
 async def info():

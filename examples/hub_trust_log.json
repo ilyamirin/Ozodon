@@ -1,0 +1,7 @@
+[
+  {"source": "https://shop.example/users/bob", "target": "https://shop.example/users/alice", "weight": 0.8, "timestamp": "2025-04-05T12:10:00Z"},
+  {"source": "https://vendor.remote/users/charlie", "target": "https://shop.example/users/bob", "weight": 0.6, "timestamp": "2025-04-05T12:40:00Z"},
+  {"source": "https://crafts.world/users/diana", "target": "https://vendor.remote/users/charlie", "weight": 0.7, "timestamp": "2025-04-05T13:50:00Z"},
+  {"source": "https://services.city/users/evan", "target": "https://crafts.world/users/diana", "weight": 0.9, "timestamp": "2025-04-05T15:30:00Z"},
+  {"source": "https://random.hub/users/frank", "target": "https://vendor.remote/users/charlie", "weight": 0.4, "timestamp": "2025-04-05T16:00:00Z"}
+]
