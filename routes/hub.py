@@ -5,14 +5,19 @@ inbox processing, search, simple trust scoring, tag/category stats, and basic
 hub info suited for lightweight federation scenarios.
 """
 from typing import Any, Dict
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
 
 import config
 from database import db
 from services.hub_service import index_offer, index_trust, load_hubs, search_products
+from services.ton_payment import TONPaymentService, confirm_delivery, request_refund
 
 router = APIRouter(prefix="/hub", tags=["hub"], include_in_schema=False)
+
+# Reuse a single service instance
+_payment_service = TONPaymentService()
 
 
 def check_enabled() -> None:
@@ -146,3 +151,167 @@ async def info() -> dict:
         "offers": await db.hub_offers.count_documents({}),
         "trust_links": await db.hub_trust_log.count_documents({}),
     }
+
+
+# ---------------------- Payments & Escrow API ----------------------
+@router.post("/payments/escrow")
+async def create_escrow(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Создать сделку с блокировкой средств (эскроу) и зарезервировать товар.
+
+    Тело запроса:
+      - product_id: str — идентификатор товара (Offer.id)
+      - buyer_address: str — TON-адрес покупателя
+      - amount_ton: float — сумма в TON (как в оффере)
+      - timeout_days: int (опц.) — окно для эскроу, по умолчанию 7
+    """
+    check_enabled()
+
+    product_id = payload.get("product_id")
+    buyer_address = payload.get("buyer_address")
+    amount_ton = payload.get("amount_ton")
+    timeout_days = int(payload.get("timeout_days", 7))
+
+    if not product_id or not isinstance(product_id, str):
+        raise HTTPException(status_code=400, detail="product_id is required")
+    if not buyer_address or not isinstance(buyer_address, str):
+        raise HTTPException(status_code=400, detail="buyer_address is required")
+    try:
+        amount_ton_num = float(amount_ton)
+    except Exception:
+        raise HTTPException(status_code=400, detail="amount_ton must be a number")
+    if amount_ton_num <= 0:
+        raise HTTPException(status_code=400, detail="amount_ton must be positive")
+
+    # Проверим наличие товара и не зарезервирован ли он уже
+    product = await db.hub_offers.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.get("reserved"):
+        raise HTTPException(status_code=409, detail="Product already reserved")
+
+    # Создаём эскроу (симуляция в сервисе)
+    try:
+        deal = await _payment_service.create_escrow_deal(
+            buyer_address=buyer_address,
+            amount_ton=amount_ton_num,
+            timeout_days=timeout_days,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    now = datetime.now(timezone.utc)
+    reserved_until = now + timedelta(days=timeout_days)
+
+    # Запишем сделку в коллекцию hub_deals
+    deal_doc = {
+        "deal_id": deal["deal_id"],
+        "status": deal["status"],  # frozen
+        "product_id": product_id,
+        "seller": product.get("seller"),
+        "buyer_address": buyer_address,
+        "amount_ton": amount_ton_num,
+        "amount_nano": deal["amount_nano"],
+        "timeout_days": timeout_days,
+        "reserved_at": now.isoformat(),
+        "reserved_until": reserved_until.isoformat(),
+        "contract_address": deal.get("contract_address"),
+    }
+    await db.hub_deals.update_one({"deal_id": deal_doc["deal_id"]}, {"$set": deal_doc}, upsert=True)
+
+    # Обновим товар: пометим как зарезервированный
+    await db.hub_offers.update_one(
+        {"id": product_id},
+        {
+            "$set": {
+                "reserved": True,
+                "reserved_deal_id": deal_doc["deal_id"],
+                "reserved_by": buyer_address,
+                "reserved_until": reserved_until.isoformat(),
+            }
+        },
+    )
+
+    return {"status": "frozen", "deal": deal_doc}
+
+
+@router.post("/payments/{deal_id}/confirm")
+async def confirm_payment(deal_id: str) -> Dict[str, Any]:
+    """Подтвердить доставку — освободить средства продавцу и завершить сделку."""
+    check_enabled()
+
+    deal = await db.hub_deals.find_one({"deal_id": deal_id})
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    if deal.get("status") != "frozen":
+        raise HTTPException(status_code=409, detail="Deal is not in frozen state")
+
+    # Симуляция вызова смарт-контракта
+    result = await confirm_delivery(deal_id)
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.hub_deals.update_one(
+        {"deal_id": deal_id},
+        {"$set": {"status": "released", "released_at": now, "release_tx": result}},
+    )
+
+    # Обновим карточку товара: снятие резерва, отметка о продаже
+    await db.hub_offers.update_one(
+        {"id": deal["product_id"]},
+        {
+            "$set": {
+                "reserved": False,
+                "sold": True,
+                "sold_deal_id": deal_id,
+            },
+            "$unset": {
+                "reserved_deal_id": "",
+                "reserved_by": "",
+                "reserved_until": "",
+            },
+        },
+    )
+
+    updated = await db.hub_deals.find_one({"deal_id": deal_id})
+    return {"status": "released", "deal": updated}
+
+
+@router.post("/payments/{deal_id}/refund")
+async def refund_payment(deal_id: str) -> Dict[str, Any]:
+    """Запросить возврат средств — снимаем бронь с товара."""
+    check_enabled()
+
+    deal = await db.hub_deals.find_one({"deal_id": deal_id})
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    if deal.get("status") != "frozen":
+        raise HTTPException(status_code=409, detail="Refund is only allowed for frozen deals")
+
+    result = await request_refund(deal_id)
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.hub_deals.update_one(
+        {"deal_id": deal_id},
+        {"$set": {"status": "refund_requested", "refund_at": now, "refund_tx": result}},
+    )
+
+    # Снимем бронь с товара
+    await db.hub_offers.update_one(
+        {"id": deal["product_id"]},
+        {
+            "$set": {"reserved": False},
+            "$unset": {"reserved_deal_id": "", "reserved_by": "", "reserved_until": ""},
+        },
+    )
+
+    updated = await db.hub_deals.find_one({"deal_id": deal_id})
+    return {"status": "refund_requested", "deal": updated}
+
+
+@router.get("/payments/{deal_id}")
+async def get_deal(deal_id: str) -> Dict[str, Any]:
+    """Получить текущее состояние сделки (эскроу)."""
+    check_enabled()
+    deal = await db.hub_deals.find_one({"deal_id": deal_id})
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
