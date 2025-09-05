@@ -1,11 +1,13 @@
 # models.py
+from typing import Optional
+
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+
 
 class TrustLink(BaseModel):
-    source: str  # actor ID
+    source: str
     target: str
-    weight: float  # 0.0 — 1.0
+    weight: float
     proof_signature: str
 
 class Product(BaseModel):
@@ -14,10 +16,11 @@ class Product(BaseModel):
     description: str
     image: Optional[str] = None
     price: str
-    currency: str = "RUB"
+    currency: str = "TON"
 
-class Offer(BaseModel):
-    actor: str
-    object: Product
-    to: List[str] = ["https://www.w3.org/ns/activitystreams#Public"]
-    tag: List[Dict] = []
+class SearchQuery(BaseModel):
+    q: Optional[str] = None
+    tag: str = ""
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    limit: int = 20

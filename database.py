@@ -10,4 +10,4 @@ async def ping_db():
         await client.admin.command('ping')
         print("✅ Подключение к MongoDB успешно")
     except Exception as e:
-        print(f"❌ Ошибка подключения к MongoDB: {e}")
+        print(f"❌ Ошибка: {e}")

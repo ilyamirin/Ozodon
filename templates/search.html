@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ozodon Hub — Поиск</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Ozodon Hub: {{ name }}</h1>
+    <form method="get">
+      <input type="text" name="q" placeholder="Поиск..." value="{{ q }}">
+      <input type="text" name="tag" placeholder="#тег" value="{{ tag }}">
+      <button type="submit">Найти</button>
+    </form>
+
+    <h2>Результаты</h2>
+    {% for p in results %}
+    <div class="product">
+      <h3>{{ p.name }}</h3>
+      <p>{{ p.description }}</p>
+      <p><strong>{{ p.price }} {{ p.currency }}</strong> от <code>{{ p.seller }}</code></p>
+      <p>Репутация продавца: ⭐ {{ "%.2f"|format(p.reputation_score) }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

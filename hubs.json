@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Ozodon Global Hub",
+    "domain": "https://hub.ozodon.net",
+    "description": "Main international hub",
+    "active": true,
+    "replica_of": []
+  },
+  {
+    "name": "Ozodon Deutschland",
+    "domain": "https://hub.korea.ozodon.org",
+    "description": "German-speaking sellers",
+    "active": true,
+    "replica_of": ["https://hub.ozodon.net"]
+  },
+  {
+    "name": "Ozodon Москва",
+    "domain": "https://moscow.ozodon.ru",
+    "description": "Русскоязычный рынок",
+    "active": true,
+    "replica_of": ["https://hub.ozodon.net"]
+  }
+]

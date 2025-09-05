@@ -44,15 +44,16 @@ def make_offer(actor: str, product: Dict[str, Any]) -> Dict[str, Any]:
     )
     return activity
 
-def make_trust(actor: str, target: str, weight: float) -> Dict[str, Any]:
-    """
-    Создаёт ActivityPub-объект Trust
-    """
-    activity = activity_base("fedmarket:Trust", actor)
-    activity["object"] = {
-        "type": "fedmarket:TrustRelationship",
-        "target": target,
-        "weight": weight,
-        "issued": "2025-04-05T12:00:00Z"
+def make_trust(actor: str, target: str, weight: float):
+    return {
+        "@context": context(),
+        "type": "fedmarket:Trust",
+        "actor": actor,
+        "object": {
+            "type": "fedmarket:TrustRelationship",
+            "target": target,
+            "weight": weight,
+            "issued": "2025-04-05T12:00:00Z"
+        },
+        "published": "2025-04-05T12:00:00Z"
     }
-    return activity
