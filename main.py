@@ -1,6 +1,8 @@
 # main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+from pathlib import Path
 
 from database import db, ping_db
 from activitypub import make_offer, make_trust
@@ -22,6 +24,16 @@ ton_service = TONPaymentService()
 @app.on_event("startup")
 async def startup():
     await ping_db()
+
+@app.get("/", response_class=PlainTextResponse)
+async def read_root():
+    """Serve README.md content at the root URL."""
+    try:
+        readme_path = Path(__file__).parent / "README.md"
+        content = readme_path.read_text(encoding="utf-8")
+        return PlainTextResponse(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load README: {e}")
 
 @app.post("/inbox")
 async def inbox(activity: dict):
