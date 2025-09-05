@@ -1,0 +1,17 @@
+{
+  "type": "Offer",
+  "actor": "https://shop1.example/users/anna",
+  "object": {
+    "schema:name": "Кружка",
+    "schema:description": "Ручная работа",
+    "schema:image": "/img/mug.jpg",
+    "schema:offers": {
+      "schema:price": "0.5",
+      "schema:priceCurrency": "TON"
+    }
+  },
+  "tag": [
+    { "type": "Hashtag", "name": "#handmade" },
+    { "type": "Hashtag", "name": "#market" }
+  ]
+}
